@@ -18,7 +18,7 @@ PLANTAS_TOXICAS = [
     "zamioculcas", "dracaena", "schefflera", "euphorbia", "yucca", "croton", "adenium", 
     "nerium", "oleander", "taxus", "wisteria", "aglaonema", "caladium", "begonia", 
     "alocasia", "anthurium", "dieffenbachia", "hedera", "ivy", "crassula", "kalanchoe", 
-    "senecio", "oxalis", "solanum", "tomato", "allium", "onion", "garlic"
+    "senecio", "oxalis", "solanum", "tomato", "allium", "onion", "garlic", "callisia"
 ]
 
 PLANTAS_SEGURAS = [
