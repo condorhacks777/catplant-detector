@@ -2,20 +2,17 @@ import streamlit as st
 import requests
 import base64
 import io
-from PIL import Image
+from PIL import Image, ImageOps  # Añadimos ImageOps para corregir el giro
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="CatPlant Detector", page_icon="🐱")
 
-# --- MOTOR DE LA API (Corregido para v3) ---
+# --- MOTOR DE LA API (v3) ---
 API_KEY = "kgRbrSOquzv4SEQC17N8xOjv5qzatV4eIePVs1wsk7vW5diJHi"
 API_URL = "https://plant.id/api/v3/identification"
 
 def identificar_con_ia(image_bytes):
-    # Convertimos la imagen a base64 correctamente para v3
     encoded_image = base64.b64encode(image_bytes).decode("utf-8")
-    
-    # Estructura exacta requerida por la API v3
     payload = {
         "images": [f"data:image/jpeg;base64,{encoded_image}"],
         "latitude": 40.41,
@@ -26,20 +23,15 @@ def identificar_con_ia(image_bytes):
         "Api-Key": API_KEY,
         "Content-Type": "application/json"
     }
-    
     try:
         response = requests.post(API_URL, json=payload, headers=headers)
         if response.status_code == 201:
             return response.json()
-        else:
-            # Esto nos ayudará a ver qué pasa en la consola si falla
-            print(f"Error de API: {response.status_code} - {response.text}")
-            return None
+        return None
     except Exception as e:
-        print(f"Error de conexión: {e}")
         return None
 
-# --- INTERFAZ (MANTENIENDO TU ESTÉTICA) ---
+# --- INTERFAZ ---
 st.title("🐱 CatPlant AI Detector")
 st.subheader("Sube una foto clara de la hoja para saber si tu gato corre peligro.")
 
@@ -47,6 +39,12 @@ archivo = st.file_uploader("Cámara o Galería", type=["jpg", "png", "jpeg"])
 
 if archivo:
     img = Image.open(archivo)
+    
+    # --- SOLUCIÓN AL GIRO DE CÁMARA ---
+    # Esto lee los metadatos de orientación del móvil y gira la foto si es necesario
+    img = ImageOps.exif_transpose(img)
+    # ---------------------------------
+
     st.image(img, caption="Planta a analizar", use_container_width=True)
     
     if st.button("🔍 Analizar Planta"):
@@ -56,18 +54,13 @@ if archivo:
             res = identificar_con_ia(buf.getvalue())
         
         if res and "result" in res:
-            # Extraemos la mejor sugerencia
             sugerencia = res['result']['classification']['suggestions'][0]
             nombre_detectado = sugerencia['name']
             
-            # Buscamos detalles de toxicidad en la respuesta de la IA
-            # Nota: En v3 la info de toxicidad puede venir en 'details' si tienes el plan adecuado
-            # Por ahora, comprobamos si la IA lo menciona o usamos una lógica de respaldo
             st.write(f"La IA cree que es una: **{nombre_detectado}**")
 
-            # Simulemos el chequeo de seguridad con el nombre real detectado
-            # (Más adelante podemos automatizar esto con un diccionario masivo)
-            plantas_seguras = ["plectranthus", "chlorophytum", "calathea", "nephrolepis"]
+            # Lógica de seguridad
+            plantas_seguras = ["plectranthus", "chlorophytum", "calathea", "nephrolepis", "haworthia"]
             es_segura = any(p in nombre_detectado.lower() for p in plantas_seguras)
 
             if not es_segura:
