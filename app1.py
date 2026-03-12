@@ -4,54 +4,91 @@ import base64
 import io
 from PIL import Image, ImageOps
 
-st.set_page_config(page_title="CatPlant Detector", page_icon="🐱")
+st.set_page_config(page_title="CatPlant AI Pro", page_icon="🐱")
 
 API_KEY = "kgRbrSOquzv4SEQC17N8xOjv5qzatV4eIePVs1wsk7vW5diJHi"
 API_URL = "https://plant.id/api/v3/identification"
 
-def analizar_planta(image_bytes):
+# --- BASE DE DATOS AMPLIADA (ASPCA & VETERINARY RECORDS) ---
+# Al usar el nombre del género, cubrimos todas las especies de esa familia.
+
+PLANTAS_TOXICAS = [
+    # Muy Comunes
+    "epipremnum", "monstera", "spathiphyllum", "aloe", "sansevieria", "ficus", "philodendron",
+    # Flores y Bulbos
+    "lilium", "tulipa", "narcissus", "hyacinthus", "amaryllis", "cyclamen", "chrysanthemum", 
+    "iris", "hydrangea", "azalea", "rhododendron", "digitalis", "pivoine", "paeonia",
+    # Palmeras y Arbustos
+    "cycas", "zamia", "zamioculcas", "dracaena", "schefflera", "euphorbia", "yucca", 
+    "codiaeum", "croton", "adenium", "nerium", "oleander", "taxus", "wisteria",
+    # De Interior populares
+    "aglaonema", "caladium", "begonia", "alocasia", "anthurium", "dieffenbachia", 
+    "hedera", "ivy", "crassula", "kalanchoe", "senecio", "pachypodium", "oxalis",
+    # Exterior y Huerto
+    "solanum", "tomato", "lycopersicon", "allium", "onion", "garlic", "clover", "trifolium"
+]
+
+PLANTAS_SEGURAS = [
+    # Helechos y Palmeras Seguras
+    "nephrolepis", "asplenium", "platycerium", "phoenix", "areca", "dypsis", 
+    "chamaedorea", "beaucarnea", "adansonia", "pachira",
+    # Suculentas y Crasas Seguras
+    "haworthia", "echeveria", "sempervivum", "schlumbergera", "hoya", "sedum",
+    # Interior y Colgantes
+    "chlorophytum", "calathea", "maranta", "fittonia", "peperomia", "plectranthus", 
+    "saintpaulia", "violeta", "bromelia", "guzmania", "tillandsia", "pachystachys",
+    # Hierbas Aromáticas (Casi todas)
+    "basilicum", "mentha", "rosmarinus", "salvia", "thymus", "oreganum", "lavandula"
+]
+
+def identificar_planta(image_bytes):
     encoded_image = base64.b64encode(image_bytes).decode("utf-8")
-    # Pedimos explícitamente los detalles de toxicidad a la IA
-    payload = {
-        "images": [f"data:image/jpeg;base64,{encoded_image}"],
-        "plant_details": ["common_names", "toxic_details"],
-        "similar_images": True
-    }
+    payload = {"images": [f"data:image/jpeg;base64,{encoded_image}"], "similar_images": True}
     headers = {"Api-Key": API_KEY, "Content-Type": "application/json"}
     try:
         r = requests.post(API_URL, json=payload, headers=headers)
         return r.json()
     except: return None
 
-st.title("🐱 CatPlant AI")
-archivo = st.file_uploader("Sube foto", type=["jpg", "png", "jpeg"])
+# --- INTERFAZ ---
+st.title("🐱 CatPlant AI Pro")
+st.subheader("Veredicto de seguridad basado en ASPCA")
+
+archivo = st.file_uploader("Saca una foto o sube imagen", type=["jpg", "png", "jpeg"])
 
 if archivo:
     img = ImageOps.exif_transpose(Image.open(archivo))
     st.image(img, use_container_width=True)
     
-    if st.button("🔍 ANALIZAR"):
-        with st.spinner('Consultando toxicidad...'):
+    if st.button("🔍 ANALIZAR SEGURIDAD"):
+        with st.spinner('Consultando base de datos botánica...'):
             buf = io.BytesIO()
             img.save(buf, format="JPEG")
-            res = analizar_planta(buf.getvalue())
+            res = identificar_planta(buf.getvalue())
         
         try:
-            # Extraemos la mejor sugerencia y sus detalles de salud
-            sugerencia = res["result"]["classification"]["suggestions"][0]
-            nombre = sugerencia['name']
-            detalles = sugerencia.get('details', {})
-            toxicidad = detalles.get('toxic_details')
+            sugerencias = res.get('result', {}).get('classification', {}).get('suggestions', [])
+            if sugerencias:
+                nombre_ia = sugerencias[0]['name'].lower()
+                st.write(f"### 🌱 Identificada: **{nombre_ia.capitalize()}**")
 
-            st.write(f"### 🌱 {nombre}")
+                # LÓGICA DE CRUCE
+                es_toxica = any(t in nombre_ia for t in PLANTAS_TOXICAS)
+                es_segura = any(s in nombre_ia for s in PLANTAS_SEGURAS)
 
-            # VEREDICTO DIRECTO DE LA IA
-            if toxicidad:
-                st.error(f"🚨 TÓXICA: {toxicidad}")
+                if es_toxica:
+                    st.error("🚨 RESULTADO: TÓXICA")
+                    st.markdown("⚠️ **Aviso:** Esta planta está en la lista de especies peligrosas. Mantenla fuera del alcance de tu mascota.")
+                elif es_segura:
+                    st.success("✅ RESULTADO: SEGURA")
+                    st.markdown("✔️ **Aviso:** Esta planta es considerada pet-friendly.")
+                else:
+                    st.warning("🚨 RIESGO DESCONOCIDO")
+                    st.info(f"No tenemos esta especie en nuestra lista rápida. [Verifica en ASPCA aquí](https://www.google.com/search?q=ASPCA+cats+is+{nombre_ia.replace(' ', '+')}+safe)")
             else:
-                st.success("✅ NO TÓXICA (Según los registros de la IA)")
+                st.error("No se pudo identificar la planta.")
         except:
-            st.warning("⚠️ No se pudo determinar con exactitud. Prueba otra foto.")
+            st.error("Error en la conexión.")
 
 st.write("---")
-st.caption("Usa fotos nítidas. En caso de duda, no dejes que tu gato la muerda.")
+st.caption("Información basada en registros generales de toxicidad felina.")
