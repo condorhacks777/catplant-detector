@@ -5,12 +5,12 @@ import io
 from PIL import Image, ImageOps
 
 # --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="CatPlant AI España 🐱", page_icon="🐱")
+st.set_page_config(page_title="CatPlant AI Pro", page_icon="🐱")
 
 API_KEY = "kgRbrSOquzv4SEQC17N8xOjv5qzatV4eIePVs1wsk7vW5diJHi"
 API_URL = "https://plant.id/api/v3/identification"
 
-# --- BASE DE DATOS MASIVA (Basada en ASPCA y registros botánicos) ---
+# --- BASE DE DATOS LOCAL (ASPCA) ---
 PLANTAS_TOXICAS = [
     "epipremnum", "monstera", "spathiphyllum", "aloe", "sansevieria", "ficus", "philodendron",
     "lilium", "tulipa", "narcissus", "hyacinthus", "amaryllis", "cyclamen", "chrysanthemum", 
@@ -31,7 +31,6 @@ PLANTAS_SEGURAS = [
 
 def identificar_planta(image_bytes):
     encoded_image = base64.b64encode(image_bytes).decode("utf-8")
-    # Configuración de latitud/longitud para España
     payload = {
         "images": [f"data:image/jpeg;base64,{encoded_image}"],
         "latitude": 40.41, 
@@ -41,58 +40,68 @@ def identificar_planta(image_bytes):
     headers = {"Api-Key": API_KEY, "Content-Type": "application/json"}
     try:
         r = requests.post(API_URL, json=payload, headers=headers)
-        if r.status_code == 201:
-            return r.json()
-        return None
+        return r.json() if r.status_code == 201 else None
     except:
         return None
 
-# --- INTERFAZ DE LA APLICACIÓN ---
-st.title("🐱 CatPlant AI España")
-st.subheader("Detector de seguridad botánica para gatos")
+def investigar_en_red(nombre_planta):
+    """Busca un resumen automático si la planta es desconocida."""
+    try:
+        # Buscamos en la API de DuckDuckGo para obtener un resumen rápido
+        url = f"https://api.duckduckgo.com/?q={nombre_planta}+toxicidad+gatos&format=json&no_html=1&kl=es-es"
+        r = requests.get(url)
+        data = r.json()
+        abstract = data.get("Abstract", "")
+        if abstract:
+            return abstract
+        return "No he encontrado un resumen automático fiable en la base de datos rápida."
+    except:
+        return "Error al conectar con el centro de investigación externo."
+
+# --- INTERFAZ ---
+st.title("🐱 CatPlant AI Pro")
+st.subheader("Seguridad botánica inteligente")
 
 archivo = st.file_uploader("Saca una foto o sube imagen", type=["jpg", "png", "jpeg"])
 
 if archivo:
-    # Corrección automática de la orientación de la imagen (EXIF)
     img = ImageOps.exif_transpose(Image.open(archivo))
-    st.image(img, use_container_width=True, caption="Planta detectada")
+    st.image(img, use_container_width=True)
     
     if st.button("🔍 ANALIZAR SEGURIDAD"):
-        with st.spinner('Identificando especie y verificando toxicidad...'):
+        with st.spinner('Identificando y buscando información...'):
             buf = io.BytesIO()
             img.save(buf, format="JPEG")
             res = identificar_planta(buf.getvalue())
         
         try:
             sugerencias = res.get('result', {}).get('classification', {}).get('suggestions', [])
-            
             if sugerencias:
                 nombre_ia = sugerencias[0]['name'].lower()
                 st.write(f"### 🌱 Especie: **{nombre_ia.capitalize()}**")
 
-                # LÓGICA DE VERIFICACIÓN
                 es_toxica = any(t in nombre_ia for t in PLANTAS_TOXICAS)
                 es_segura = any(s in nombre_ia for s in PLANTAS_SEGURAS)
 
                 if es_toxica:
                     st.error("🚨 RESULTADO: TÓXICA")
-                    st.markdown("**Advertencia:** Esta planta es peligrosa para los gatos. Evita cualquier contacto.")
+                    st.info("Esta planta está confirmada como peligrosa en nuestra base de datos ASPCA.")
                 elif es_segura:
                     st.success("✅ RESULTADO: SEGURA")
-                    st.markdown("**Info:** Esta especie es apta para convivir con gatos.")
+                    st.info("Esta planta está confirmada como pet-friendly en nuestra base de datos.")
                 else:
-                    st.warning("⚠️ ESPECIE NO REGISTRADA")
-                    st.write("Esta planta no está en mi base de datos de verificación inmediata.")
+                    st.warning("⚠️ ESPECIE NO REGISTRADA EN LOCAL")
+                    # AUTO-INVESTIGACIÓN
+                    with st.status("Investigando en internet...", expanded=True) as status:
+                        resumen = investigar_en_red(nombre_ia)
+                        st.write(f"**Resultado de la investigación:** {resumen}")
+                        status.update(label="Investigación completada", state="complete")
                     
-                    # Botón de búsqueda directa en Google España
-                    termino = nombre_ia.replace(' ', '+')
-                    url_google = f"https://www.google.es/search?q=es+la+planta+{termino}+toxica+para+gatos+español"
-                    st.link_button("🔍 Investigar en Google España", url_google)
+                    st.link_button("Verificar detalles en Google España", f"https://www.google.es/search?q=es+la+planta+{nombre_ia.replace(' ', '+')}+toxica+para+gatos+español")
             else:
-                st.error("No se ha podido identificar la planta. Intenta enfocar mejor las hojas.")
+                st.error("No se pudo identificar. Prueba con otra foto.")
         except:
-            st.error("Error al procesar la respuesta de la IA.")
+            st.error("Error en la comunicación con la IA.")
 
 st.write("---")
-st.caption("Nota: Esta herramienta es informativa. Ante una emergencia, contacta con tu veterinario.")
+st.caption("Uso informativo. Consulta siempre a un profesional veterinario.")
