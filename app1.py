@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import base64
 import io
-from PIL import Image, ImageOps  # Añadimos ImageOps para corregir el giro
+from PIL import Image, ImageOps
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="CatPlant Detector", page_icon="🐱")
@@ -40,41 +40,49 @@ archivo = st.file_uploader("Cámara o Galería", type=["jpg", "png", "jpeg"])
 if archivo:
     img = Image.open(archivo)
     
-    # --- SOLUCIÓN AL GIRO DE CÁMARA ---
-    # Esto lee los metadatos de orientación del móvil y gira la foto si es necesario
+    # 1. CORRECCIÓN DE GIRO (Móviles)
     img = ImageOps.exif_transpose(img)
-    # ---------------------------------
 
-    st.image(img, caption="Planta a analizar", use_container_width=True)
+    st.image(img, caption="Muestra cargada", use_container_width=True)
     
     if st.button("🔍 Analizar Planta"):
-        with st.spinner('Analizando...'):
+        with st.spinner('Analizando con inteligencia artificial...'):
             buf = io.BytesIO()
             img.save(buf, format="JPEG")
             res = identificar_con_ia(buf.getvalue())
         
         if res and "result" in res:
-            sugerencia = res['result']['classification']['suggestions'][0]
-            nombre_detectado = sugerencia['name']
-            
-            st.write(f"La IA cree que es una: **{nombre_detectado}**")
-
-            # Lógica de seguridad
-            plantas_seguras = ["plectranthus", "chlorophytum", "calathea", "nephrolepis", "haworthia"]
-            es_segura = any(p in nombre_detectado.lower() for p in plantas_seguras)
-
-            if not es_segura:
-                st.markdown(f"## Resultado: :red[TÓXICA / RIESGO]")
-                with st.expander("Ver detalles de seguridad"):
-                    st.write(f"La especie {nombre_detectado} puede presentar riesgos. Evita que tu gato la muerda.")
-                st.error("🚨 ¡CUIDADO! Mantén esta planta fuera del alcance de tu gato.")
+            # 2. FILTRO "ES PLANTA" (Evita coches de F1 y vasos)
+            es_planta_info = res['result']['classification']['is_plant']
+            if not es_planta_info['binary']:
+                st.error("❌ La IA detecta que esto NO es una planta. Por favor, sube una foto de un ser vivo botánico.")
             else:
-                st.markdown(f"## Resultado: :green[SEGURA]")
-                with st.expander("Ver detalles de seguridad"):
-                    st.write(f"La especie {nombre_detectado} está registrada como segura para mascotas.")
-                st.success("✅ ¡Todo bien! Esta planta es segura para convivir con gatos.")
+                sugerencia = res['result']['classification']['suggestions'][0]
+                nombre_detectado = sugerencia['name']
+                probabilidad = sugerencia['probability']
+
+                # 3. FILTRO DE CONFIANZA
+                if probabilidad < 0.40:
+                    st.warning(f"🤔 No estoy muy segura (Confianza: {probabilidad:.1%}). Intenta sacar la foto más cerca de las hojas.")
+                else:
+                    st.write(f"La IA cree que es una: **{nombre_detectado}**")
+
+                    # Lógica de seguridad (Puedes ampliar esta lista)
+                    plantas_seguras = ["plectranthus", "chlorophytum", "calathea", "nephrolepis", "haworthia"]
+                    es_segura = any(p in nombre_detectado.lower() for p in plantas_seguras)
+
+                    if not es_segura:
+                        st.markdown(f"## Resultado: :red[TÓXICA / RIESGO]")
+                        with st.expander("Ver detalles de seguridad"):
+                            st.write(f"La especie {nombre_detectado} tiene registros de riesgo. Evita que tu gato la muerda.")
+                        st.error("🚨 ¡CUIDADO! Mantén esta planta fuera del alcance de tu gato.")
+                    else:
+                        st.markdown(f"## Resultado: :green[SEGURA]")
+                        with st.expander("Ver detalles de seguridad"):
+                            st.write(f"La especie {nombre_detectado} es considerada segura para convivir con gatos.")
+                        st.success("✅ ¡Todo bien! Esta planta es segura.")
         else:
-            st.error("No se pudo identificar. Revisa tu conexión o la API Key.")
+            st.error("Error al conectar con la IA. Revisa tu conexión.")
 
 st.write("---")
 st.caption("Nota: Esta app es una herramienta de apoyo. Ante cualquier síntoma, acude a tu veterinario.")
