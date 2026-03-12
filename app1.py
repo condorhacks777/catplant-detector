@@ -105,3 +105,5 @@ if archivo:
 
 st.write("---")
 st.caption("Uso informativo. Consulta siempre a un profesional veterinario.")
+st.write("---")
+st.info("📢 **¿Te gusta esta App?** Compártela con otros dueños de gatos para mantener sus hogares seguros.")
