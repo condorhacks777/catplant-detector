@@ -26,7 +26,7 @@ PLANTAS_SEGURAS = [
     "chamaedorea", "beaucarnea", "pachira", "haworthia", "echeveria", "sempervivum", 
     "schlumbergera", "hoya", "sedum", "chlorophytum", "calathea", "maranta", 
     "fittonia", "peperomia", "plectranthus", "saintpaulia", "violeta", "bromelia", 
-    "guzmania", "tillandsia", "basilicum", "mentha", "rosmarinus", "salvia", "thymus"
+    "guzmania", "tillandsia", "basilicum", "mentha", "rosmarinus", "salvia", "thymus", "carnegiea gigantea"
 ]
 
 def identificar_planta(image_bytes):
