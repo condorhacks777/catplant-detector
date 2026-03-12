@@ -7,7 +7,7 @@ from PIL import Image, ImageOps
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="CatPlant AI Pro", page_icon="🐱")
 
-API_KEY = "kgRbrSOquzv4SEQC17N8xOjv5qzatV4eIePVs1wsk7vW5diJHi"
+API_KEY ="PCfPGYk4XrwncODoi6fQrEvZgUhv3ViBHybHQIpsTcf1NgqDOu"
 API_URL = "https://plant.id/api/v3/identification"
 
 # --- BASE DE DATOS LOCAL (ASPCA) ---
